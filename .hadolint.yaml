@@ -1,0 +1,10 @@
+ignored:
+  # DL3008: Pin versions in apt get install
+  # We accept the risk of not pinning apt package versions for simplicity
+  - DL3008
+  # DL3009: Delete the apt-get lists after installing something
+  # We already do this with rm -rf /var/lib/apt/lists/*
+  - DL3009
+  # DL3059: Multiple consecutive RUN instructions
+  # We prefer readability over layer optimization in some cases
+  - DL3059

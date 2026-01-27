@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Documentation
+*.md
+CODEBUDDY.md
+LICENSE
+
+# Build artifacts
+target/
+**/*.rs.bk
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+tests/
+
+# Environment files
+.env
+.env.*
