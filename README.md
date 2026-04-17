@@ -50,6 +50,7 @@ The server requires the following environment variables:
 | `AZURE_AI_SEARCH_BASE_URL` | Azure AI Search base URL | `https://web-search-mcp-test.search.windows.net` |
 | `AZURE_AI_SEARCH_KB_NAME` | Knowledge base name | `web-search-kb` |
 | `AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_NAME` | Knowledge source name | `web-search` |
+| `AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_KIND` | Knowledge source kind (`web` or `searchIndex`) | `web` |
 | `AZURE_AI_SEARCH_API_KEY` | API key for authentication | `your-api-key` |
 
 ## MCP Tool
@@ -94,6 +95,7 @@ docker run -p 3000:3000 \
   -e AZURE_AI_SEARCH_BASE_URL="https://your-search.search.windows.net" \
   -e AZURE_AI_SEARCH_KB_NAME="your-kb-name" \
   -e AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_NAME="web-search" \
+  -e AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_KIND="web" \
   -e AZURE_AI_SEARCH_API_KEY="your-api-key" \
   web-search-mcp
 ```
@@ -116,6 +118,14 @@ Options:
 
 - Rust 1.70+
 - Azure AI Search account with a configured knowledge base
+
+## Azure AI Search Setup Guide
+
+- Create new `AI Search` Resource in Azure
+- Create a new "Knowledge source" of type "Web" (Bing)
+- Create a new "Knowledge base"
+  - Select the knowledge source you created in the previous step
+  - Configure model and reasoning effort
 
 ## License
 

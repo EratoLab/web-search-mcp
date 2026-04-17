@@ -47,6 +47,9 @@ impl Tool for WebSearchTool {
                     .to_string(),
             })?;
 
+        let knowledge_source_kind = std::env::var("AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_KIND")
+            .unwrap_or_else(|_| "web".to_string());
+
         let api_key = std::env::var("AZURE_AI_SEARCH_API_KEY")
             .map_err(|_| BrowserError::ToolExecutionFailed {
                 tool: "web_search".to_string(),
@@ -77,7 +80,7 @@ impl Tool for WebSearchTool {
             "knowledgeSourceParams": [
                 {
                     "knowledgeSourceName": knowledge_source_name,
-                    "kind": "searchIndex",
+                    "kind": knowledge_source_kind,
                     "includeReferences": true,
                     "includeReferenceSourceData": true,
                     "alwaysQuerySource": false
