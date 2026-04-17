@@ -30,7 +30,7 @@ jobs:
   lint-dockerfile:
     timeout-minutes: 10
     name: "lint dockerfile"
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +40,7 @@ jobs:
           dockerfile: Dockerfile
 
 #  cargo-clippy:
-#    runs-on: blacksmith-8vcpu-ubuntu-2204
+#    runs-on: ubuntu-22.04
 #    name: "cargo clippy"
 #    steps:
 #      - uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
 #        run: cargo clippy --all-targets --locked -- -D warnings
 
   test:
-    runs-on: blacksmith-8vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     name: "test"
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
         run: cargo test --all-features
 
   build-and-push-amd64:
-    runs-on: blacksmith-8vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     needs: [lint-dockerfile, test]
     permissions:
       contents: read
@@ -88,11 +88,11 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Setup Blacksmith Builder
-        uses: useblacksmith/setup-docker-builder@v1
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
-        uses: useblacksmith/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -104,7 +104,7 @@ jobs:
             ${{ env.RELEASE_VERSION != '' && format('{0}/{1}:{2}-amd64', env.REGISTRY, env.IMAGE_NAME, env.RELEASE_VERSION) || '' }}
 
   build-and-push-arm64:
-    runs-on: blacksmith-8vcpu-ubuntu-2204-arm
+    runs-on: ubuntu-22.04
     needs: [lint-dockerfile, test]
     permissions:
       contents: read
@@ -120,11 +120,11 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Setup Blacksmith Builder
-        uses: useblacksmith/setup-docker-builder@v1
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
-        uses: useblacksmith/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -137,7 +137,7 @@ jobs:
 
   create-manifests:
     needs: [build-and-push-amd64, build-and-push-arm64]
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     steps:
       - name: Log in to Harbor registry
         uses: docker/login-action@v3
@@ -146,8 +146,8 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Setup Blacksmith Builder
-        uses: useblacksmith/setup-docker-builder@v1
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Create and push manifests
         run: |
@@ -170,7 +170,7 @@ jobs:
 
   create-github-release:
     needs: [create-manifests]
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     if: github.ref_type == 'tag'
     permissions:
       contents: write
