@@ -10,7 +10,7 @@ use rmcp::{
 
 /// MCP Server wrapper for web search
 ///
-/// This struct provides web search capabilities via Azure AI Search
+/// This struct provides web search capabilities via configurable providers
 #[derive(Clone)]
 pub struct BrowserServer {
     tool_router: ToolRouter<Self>,
@@ -41,7 +41,10 @@ impl Drop for BrowserServer {
 impl ServerHandler for BrowserServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            instructions: Some("Web Search MCP Server - Provides web search capabilities via Azure AI Search".into()),
+            instructions: Some(
+                "Web Search MCP Server - Provides web search capabilities via Azure AI Search and Perplexity."
+                    .into(),
+            ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()
         }

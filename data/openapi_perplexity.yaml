@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  title: Perplexity Search API
+  version: 1.0.0
+  description: >-
+    Unofficial OpenAPI specification derived from Perplexity API docs page
+    `https://docs.perplexity.ai/api-reference/search-post` (as of 2026-04-23).
+    This specification is not officially provided by Perplexity.
+servers:
+  - url: https://api.perplexity.ai
+    description: Production API endpoint for Perplexity.
+paths:
+  /search:
+    post:
+      tags:
+        - Search API
+      summary: Search the web
+      description: Search the web and retrieve relevant web page contents.
+      operationId: searchTheWeb
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+            examples:
+              minimal:
+                summary: Minimal request
+                value:
+                  query: "example query"
+              detailed:
+                summary: Detailed request
+                value:
+                  query: "example query"
+                  max_results: 10
+                  country: US
+                  max_tokens: 10000
+                  max_tokens_per_page: 4096
+                  search_language_filter: ["en"]
+                  search_domain_filter: ["example.com"]
+                  search_recency_filter: week
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+              examples:
+                success:
+                  value:
+                    results:
+                      - title: Example result
+                        url: https://example.com/article
+                        snippet: Example snippet.
+                        date: 01/01/2026
+                        last_updated: 01/02/2026
+                    id: "search-123"
+                    server_time: "2026-04-23T12:00:00Z"
+        '422':
+          description: Validation or request error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchError"
+              example:
+                type: "https://api.perplexity.ai/errors/validation"
+                title: "Validation Error"
+                status: 422
+                detail: "One or more request fields are invalid."
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
+      description: >-
+        Authorization header must be in the form `Bearer <token>`, where `<token>` is your auth token.
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          oneOf:
+            - type: string
+              description: Search query string (required)
+            - type: array
+              description: Search query as list of strings (observed in docs as string/string[] notation)
+              items:
+                type: string
+          example: "example query"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: ISO 3166-1 alpha-2 country code
+          example: US
+        max_results:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 10
+          description: Maximum number of results to return
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          default: 10000
+          description: Maximum tokens for context
+        max_tokens_per_page:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          default: 4096
+          description: Maximum tokens per page
+        search_language_filter:
+          type: array
+          description: ISO 639-1 language codes
+          items:
+            type: string
+            minLength: 2
+            maxLength: 2
+          maxItems: 20
+        search_domain_filter:
+          type: array
+          description: Limit search results to specific domains
+          items:
+            type: string
+            maxLength: 253
+          maxItems: 20
+        last_updated_after_filter:
+          type: string
+          description: Return results updated after this date (`MM/DD/YYYY`)
+          example: 01/01/2026
+        last_updated_before_filter:
+          type: string
+          description: Return results updated before this date (`MM/DD/YYYY`)
+          example: 12/31/2026
+        search_after_date_filter:
+          type: string
+          description: Return results published after this date (`MM/DD/YYYY`)
+          example: 01/01/2026
+        search_before_date_filter:
+          type: string
+          description: Return results published before this date (`MM/DD/YYYY`)
+          example: 12/31/2026
+        search_recency_filter:
+          type: string
+          enum:
+            - hour
+            - day
+            - week
+            - month
+            - year
+          description: Filter by publication recency
+    SearchResponse:
+      type: object
+      required:
+        - results
+        - id
+        - server_time
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiSearchPage"
+        id:
+          type: string
+        server_time:
+          type: string
+          nullable: true
+    ApiSearchPage:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+        snippet:
+          type: string
+        date:
+          type: string
+          description: Publication date (as exposed by the API)
+        last_updated:
+          type: string
+          description: Last update date/time (as exposed by the API)
+    SearchError:
+      type: object
+      description: Response for request validation or malformed input.
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
