@@ -3,6 +3,10 @@ use thiserror::Error;
 /// Core error type for web search operations
 #[derive(Error, Debug)]
 pub enum BrowserError {
+    /// Configuration error
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+
     /// Tool execution failed
     #[error("Tool '{tool}' execution failed: {reason}")]
     ToolExecutionFailed { tool: String, reason: String },

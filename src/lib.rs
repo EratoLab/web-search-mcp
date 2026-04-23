@@ -1,24 +1,20 @@
 //! # web-search-mcp
 //!
-//! A Model Context Protocol (MCP) server for web search using Azure AI Search.
+//! A Model Context Protocol (MCP) server for web search using configurable providers.
 //!
 //! ## Features
 //!
 //! - **MCP Server**: Model Context Protocol server for web search
-//! - **Azure AI Search Integration**: Uses Azure AI Search knowledge bases for web search
-//! - **Simple Configuration**: Configure via environment variables
+//! - **Configurable Providers**: Configure multiple providers through TOML
+//! - **Simple Configuration**: Configure via TOML file
 //!
 //! ## MCP Server
 //!
 //! ### Running the MCP Server
 //!
 //! ```bash
-//! # Set required environment variables
-//! export AZURE_AI_SEARCH_BASE_URL="https://your-search.search.windows.net"
-//! export AZURE_AI_SEARCH_KB_NAME="your-kb-name"
-//! export AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_NAME="web-search"
-//! export AZURE_AI_SEARCH_API_KEY="your-api-key"
-//!
+//! # Use the default config file path: ./mcp-server.toml
+//! 
 //! # Run the server
 //! cargo run --bin mcp-server
 //! ```
@@ -27,9 +23,12 @@
 //!
 //! - [`tools`]: Web search tools
 //! - [`error`]: Error types and result aliases
+//! - [`config`]: Configuration management
 //! - [`mcp`]: **Model Context Protocol server** (requires `mcp-handler` feature)
 
+pub mod config;
 pub mod error;
+pub mod providers;
 pub mod tools;
 
 #[cfg(feature = "mcp-handler")]

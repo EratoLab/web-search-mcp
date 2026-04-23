@@ -53,5 +53,5 @@ macro_rules! register_mcp_tools {
 
 // Register all MCP tools using the macro
 register_mcp_tools! {
-    web_search => tools::web_search::WebSearchTool, "Perform a web search using Azure AI Search. Returns search results with response text and references.";
+    web_search => tools::web_search::WebSearchTool, "Perform a web search using the configured provider. Returns search results and metadata.";
 }

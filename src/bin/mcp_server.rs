@@ -1,13 +1,15 @@
 //! Web Search MCP Server
 //!
 //! This binary provides a Model Context Protocol (MCP) server for web search.
-//! It uses Azure AI Search to perform web searches that can be used by AI assistants and other MCP clients.
+//! It supports configurable providers to perform web searches that can be used by AI assistants and
+//! other MCP clients.
 
 use web_search_mcp::mcp::BrowserServer;
 use clap::{Parser, ValueEnum};
 use log::{debug, info};
 use rmcp::{ServiceExt, transport::stdio};
 use std::io::{stdin, stdout};
+use std::sync::Arc;
 
 #[cfg(feature = "mcp-server")]
 use rmcp::transport::{
@@ -31,31 +33,35 @@ enum Transport {
 #[derive(Parser)]
 #[command(name = "web-search-mcp")]
 #[command(version)]
-#[command(about = "Web Search MCP server using Azure AI Search", long_about = None)]
+#[command(about = "Web Search MCP server with configurable providers", long_about = None)]
 struct Cli {
-    /// Transport type to use
-    #[arg(long, short = 't', value_enum, default_value = "stdio")]
-    transport: Transport,
+    /// Path to MCP server configuration file
+    #[arg(long, short = 'c')]
+    config: Option<String>,
 
-    /// Port for SSE or HTTP transport (default: 3000)
-    #[arg(long, short = 'p', default_value = "3000")]
-    port: u16,
+    /// Transport type to use
+    #[arg(long, short = 't', value_enum)]
+    transport: Option<Transport>,
+
+    /// Port for SSE or HTTP transport
+    #[arg(long, short = 'p')]
+    port: Option<u16>,
 
     /// Host address to bind to (default: 127.0.0.1)
-    #[arg(long, default_value = "127.0.0.1")]
-    host: String,
+    #[arg(long)]
+    host: Option<String>,
 
     /// SSE endpoint path (default: /sse)
-    #[arg(long, default_value = "/sse")]
-    sse_path: String,
+    #[arg(long)]
+    sse_path: Option<String>,
 
     /// SSE POST path for messages (default: /message)
-    #[arg(long, default_value = "/message")]
-    sse_post_path: String,
+    #[arg(long)]
+    sse_post_path: Option<String>,
 
     /// HTTP streamable endpoint path (default: /mcp)
-    #[arg(long, default_value = "/mcp")]
-    http_path: String,
+    #[arg(long)]
+    http_path: Option<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -65,25 +71,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Web Search MCP Server v{}", env!("CARGO_PKG_VERSION"));
 
-    // Check that required environment variables are set
-    let required_vars = [
-        "AZURE_AI_SEARCH_BASE_URL",
-        "AZURE_AI_SEARCH_KB_NAME",
-        "AZURE_AI_SEARCH_KNOWLEDGE_SOURCE_NAME",
-        "AZURE_AI_SEARCH_API_KEY",
-    ];
+    let config = Arc::new(web_search_mcp::config::ServerConfig::load(cli.config).await?);
 
-    for var in &required_vars {
-        if std::env::var(var).is_err() {
-            return Err(format!("Required environment variable {} is not set", var).into());
-        }
-    }
+    let transport_type = match cli.transport {
+        Some(Transport::Stdio) => "stdio".to_string(),
+        Some(Transport::Sse) => "sse".to_string(),
+        Some(Transport::Http) => "http".to_string(),
+        None => config.transport.transport.clone(),
+    };
 
-    info!("Azure AI Search configuration loaded");
+    let host = cli.host.unwrap_or_else(|| config.transport.host.clone());
+    let port = cli.port.unwrap_or(config.transport.port);
+    let sse_path = cli.sse_path.unwrap_or_else(|| config.transport.sse_path.clone());
+    let sse_post_path = cli
+        .sse_post_path
+        .unwrap_or_else(|| config.transport.sse_post_path.clone());
+    let http_path = cli
+        .http_path
+        .unwrap_or_else(|| config.transport.http_path.clone());
+
+    info!("Loaded configuration for {}", config.server.name);
+    web_search_mcp::config::set_global_config(config).await;
 
     // Route to appropriate transport
-    match cli.transport {
-        Transport::Stdio => {
+    match transport_type.as_str() {
+        "stdio" => {
             info!("Transport: stdio");
             info!("Ready to accept MCP connections via stdio");
             let (_read, _write) = (stdin(), stdout());
@@ -136,20 +148,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 debug!("Server quit with reason: {:?}", quit_reason);
             }
         }
-        Transport::Sse => {
+        "sse" => {
             info!("Transport: SSE");
-            info!("Host: {}", cli.host);
-            info!("Port: {}", cli.port);
-            info!("SSE path: {}", cli.sse_path);
-            info!("SSE POST path: {}", cli.sse_post_path);
+            info!("Host: {}", host);
+            info!("Port: {}", port);
+            info!("SSE path: {}", sse_path);
+            info!("SSE POST path: {}", sse_post_path);
 
-            let bind_addr = format!("{}:{}", cli.host, cli.port);
+            let bind_addr = format!("{}:{}", host, port);
 
             // Create SSE server configuration
             let config = SseServerConfig {
                 bind: bind_addr.parse()?,
-                sse_path: cli.sse_path.clone(),
-                post_path: cli.sse_post_path.clone(),
+                sse_path: sse_path.clone(),
+                post_path: sse_post_path.clone(),
                 ct: CancellationToken::new(),
                 sse_keep_alive: None,
             };
@@ -159,7 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             info!(
                 "Ready to accept MCP connections at http://{}{}",
-                bind_addr, cli.sse_path
+                bind_addr, sse_path
             );
 
             // Register service factory for each connection
@@ -172,13 +184,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
             axum::serve(listener, router.into_make_service()).await?;
         }
-        Transport::Http => {
+        "http" => {
             info!("Transport: HTTP streamable");
-            info!("Host: {}", cli.host);
-            info!("Port: {}", cli.port);
-            info!("HTTP path: {}", cli.http_path);
+            info!("Host: {}", host);
+            info!("Port: {}", port);
+            info!("HTTP path: {}", http_path);
 
-            let bind_addr = format!("{}:{}", cli.host, cli.port);
+            let bind_addr = format!("{}:{}", host, port);
 
             // Create service factory closure
             let service_factory = move || {
@@ -192,15 +204,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Default::default(),
             );
 
-            let router = axum::Router::new().nest_service(&cli.http_path, http_service);
+            let router = axum::Router::new().nest_service(&http_path, http_service);
 
             info!(
                 "Ready to accept MCP connections at http://{}{}",
-                bind_addr, cli.http_path
+                bind_addr, http_path
             );
 
             let listener = tokio::net::TcpListener::bind(bind_addr).await?;
             axum::serve(listener, router).await?;
+        }
+        other => {
+            return Err(format!("Invalid transport type: {}", other).into());
         }
     }
 

@@ -6,6 +6,7 @@ pub mod web_search;
 
 // Re-export Params types for use by MCP layer
 pub use web_search::WebSearchParams;
+pub use web_search::WebSearchTool;
 
 use crate::error::Result;
 use serde_json::Value;
@@ -157,7 +158,7 @@ impl ToolRegistry {
     pub fn with_defaults() -> Self {
         let mut registry = Self::new();
 
-        // Register the web_search tool
+        // Register web search provider tools
         registry.register(web_search::WebSearchTool);
 
         registry
