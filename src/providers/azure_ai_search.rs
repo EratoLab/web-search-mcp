@@ -2,6 +2,7 @@ use crate::config::ToolSection;
 use crate::error::{BrowserError, Result};
 use crate::tools::ToolResult;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 const TOOL_NAME: &str = "azure_ai_search_web";
 
@@ -51,7 +52,13 @@ pub async fn execute(query: String) -> Result<ToolResult> {
         ]
     });
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| BrowserError::ToolExecutionFailed {
+            tool: TOOL_NAME.to_string(),
+            reason: format!("Failed to build Azure reqwest client: {e}"),
+        })?;
     let response = client
         .post(&url)
         .header("Content-Type", "application/json")
@@ -76,12 +83,14 @@ pub async fn execute(query: String) -> Result<ToolResult> {
         });
     }
 
-    let search_response: AzureSearchResponse = response.json().await.map_err(|e| {
-        BrowserError::ToolExecutionFailed {
-            tool: TOOL_NAME.to_string(),
-            reason: format!("Failed to parse Azure AI Search response: {}", e),
-        }
-    })?;
+    let search_response: AzureSearchResponse =
+        response
+            .json()
+            .await
+            .map_err(|e| BrowserError::ToolExecutionFailed {
+                tool: TOOL_NAME.to_string(),
+                reason: format!("Failed to parse Azure AI Search response: {}", e),
+            })?;
 
     let response_text = search_response
         .response
@@ -110,7 +119,8 @@ async fn resolve_azure_search_config() -> Result<AzureSearchWebConfig> {
 
     let azure = tool_config.azure_ai_search_web.as_ref().ok_or_else(|| {
         BrowserError::ConfigError(
-            "Azure AI Search Web provider is not configured in [tool.azure_ai_search_web]".to_string(),
+            "Azure AI Search Web provider is not configured in [tool.azure_ai_search_web]"
+                .to_string(),
         )
     })?;
 

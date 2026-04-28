@@ -3,6 +3,7 @@ use crate::error::{BrowserError, Result};
 use crate::tools::ToolResult;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::time::Duration;
 
 const TOOL_NAME: &str = "perplexity_search";
 
@@ -84,7 +85,13 @@ pub async fn execute(query: String) -> Result<ToolResult> {
         search_config.search_recency_filter.as_ref(),
     );
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| BrowserError::ToolExecutionFailed {
+            tool: TOOL_NAME.to_string(),
+            reason: format!("Failed to build Perplexity reqwest client: {e}"),
+        })?;
     let response = client
         .post(&url)
         .header("Content-Type", "application/json")
@@ -109,13 +116,14 @@ pub async fn execute(query: String) -> Result<ToolResult> {
         });
     }
 
-    let search_response: PerplexitySearchResponse = response
-        .json()
-        .await
-        .map_err(|e| BrowserError::ToolExecutionFailed {
-            tool: TOOL_NAME.to_string(),
-            reason: format!("Failed to parse Perplexity response: {}", e),
-        })?;
+    let search_response: PerplexitySearchResponse =
+        response
+            .json()
+            .await
+            .map_err(|e| BrowserError::ToolExecutionFailed {
+                tool: TOOL_NAME.to_string(),
+                reason: format!("Failed to parse Perplexity response: {}", e),
+            })?;
 
     Ok(ToolResult::success_with(serde_json::json!({
         "results": search_response.results,
@@ -156,7 +164,10 @@ async fn resolve_perplexity_config() -> Result<PerplexityConfigRuntime> {
 fn merge_optional_param<T: serde::Serialize>(body: &mut Value, key: &str, value: Option<&T>) {
     if let Some(value) = value {
         if let Some(map) = body.as_object_mut() {
-            map.insert(key.to_string(), serde_json::to_value(value).unwrap_or(Value::Null));
+            map.insert(
+                key.to_string(),
+                serde_json::to_value(value).unwrap_or(Value::Null),
+            );
         }
     }
 }

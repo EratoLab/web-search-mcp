@@ -31,7 +31,7 @@ pub struct ServerSection {
 /// Transport configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransportConfig {
-    /// Transport type: stdio, sse, or http
+    /// Transport type: stdio, or http
     #[serde(default = "default_transport_type")]
     pub transport: String,
 
@@ -39,7 +39,7 @@ pub struct TransportConfig {
     #[serde(default = "default_host")]
     pub host: String,
 
-    /// Port for SSE or HTTP transport
+    /// Port for HTTP transport
     #[serde(default = "default_port")]
     pub port: u16,
 
@@ -117,6 +117,10 @@ pub struct SearchToolConfig {
     /// Perplexity search provider configuration.
     #[serde(default)]
     pub perplexity_search: Option<PerplexitySearchConfig>,
+
+    /// GenAI Responses (OpenAI Responses API) search provider configuration.
+    #[serde(default)]
+    pub genai_responses: Option<GenAIResponsesSearchConfig>,
 }
 
 /// Azure AI Search Web provider configuration.
@@ -153,6 +157,48 @@ pub struct PerplexitySearchConfig {
     pub search_recency_filter: Option<String>,
 }
 
+/// GenAI Responses search provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenAIResponsesSearchConfig {
+    /// Base URL for the Responses API endpoint.
+    pub base_url: String,
+
+    /// Model used for the Responses call.
+    #[serde(alias = "model_name")]
+    pub model: String,
+
+    /// API key for the provider.
+    pub api_key: String,
+
+    /// Optional API version for providers that require it.
+    pub api_version: Option<String>,
+
+    /// Optional auth header name for the API key (defaults to `Authorization`).
+    #[serde(default)]
+    pub api_key_header: Option<String>,
+
+    /// Optional system prompt used for responses requests.
+    #[serde(default)]
+    pub system_prompt: Option<String>,
+
+    /// Optional `max_uses` setting passed to the built-in web_search tool.
+    #[serde(default)]
+    pub tool_max_uses: Option<u32>,
+
+    /// Optional allowlist passed to the built-in web_search tool.
+    #[serde(default)]
+    pub tool_allowed_domains: Option<Vec<String>>,
+
+    /// Optional reasoning effort passed to the Responses API.
+    /// If unset, defaults to "none".
+    #[serde(default)]
+    pub reasoning: Option<String>,
+
+    /// Optional blocklist passed to the built-in web_search tool.
+    #[serde(default)]
+    pub tool_blocked_domains: Option<Vec<String>>,
+}
+
 fn default_perplexity_base_url() -> String {
     "https://api.perplexity.ai".to_string()
 }
@@ -166,6 +212,9 @@ impl SearchToolConfig {
         if self.perplexity_search.is_some() {
             providers.push("perplexity_search");
         }
+        if self.genai_responses.is_some() {
+            providers.push("genai_responses");
+        }
         providers
     }
 
@@ -177,6 +226,7 @@ impl SearchToolConfig {
         match provider {
             "azure_ai_search_web" => self.azure_ai_search_web.is_some(),
             "perplexity_search" => self.perplexity_search.is_some(),
+            "genai_responses" => self.genai_responses.is_some(),
             _ => false,
         }
     }
@@ -190,9 +240,10 @@ impl SearchToolConfig {
             if self.has_provider(default_provider) {
                 return Ok(default_provider.to_string());
             }
-            return Err(BrowserError::ConfigError(
-                format!("Invalid default_provider '{}'.", default_provider),
-            ));
+            return Err(BrowserError::ConfigError(format!(
+                "Invalid default_provider '{}'.",
+                default_provider
+            )));
         }
 
         let providers = self.configured_providers();
@@ -294,13 +345,24 @@ impl ServerConfig {
                  knowledge_source_name = \"web-search\"\n\
                  api_key = \"your-api-key\"\n\
                  knowledge_source_kind = \"web\"\n\n\
+\n\
+[tool.genai_responses]\n\
+base_url = \"https://{{your-resource}}.services.ai.azure.com/openai/deployments/{{your-deployment}}\"\n\
+model = \"gpt-4o\"\n\
+api_key = \"your-genai-api-key\"\n\
+api_version = \"2025-04-01-preview\"\n\
+api_key_header = \"api-key\"\n\
+reasoning = \"none\"\n\
+system_prompt = \"Always use the web_search tool and return concise results.\"\n\
+tool_max_uses = 3\n\
+tool_allowed_domains = [\"rust-lang.org\", \"docs.rs\", \"github.com\"]\n\n\
                  [metadata]\n\
                  prefix = \"chat.erato/\"\n\
 \n\
                  [tool.perplexity_search]\n\
                  api_key = \"your-perplexity-api-key\"\n\
                  base_url = \"https://api.perplexity.ai\"\n"
-            )))
+            )));
         }
 
         Ok(default_path)
@@ -342,7 +404,7 @@ impl ServerConfig {
         }
 
         // Validate transport type
-        let valid_transports = ["stdio", "sse", "http"];
+        let valid_transports = ["stdio", "http"];
         if !valid_transports.contains(&self.transport.transport.as_str()) {
             return Err(BrowserError::ConfigError(format!(
                 "Invalid transport type: '{}'. Must be one of: {}",
@@ -356,14 +418,14 @@ impl ServerConfig {
 
         if configured.is_empty() {
             return Err(BrowserError::ConfigError(
-                "No search providers configured. Configure at least one of [tool.azure_ai_search_web] or [tool.perplexity_search]."
+                "No search providers configured. Configure at least one of [tool.azure_ai_search_web], [tool.perplexity_search], or [tool.genai_responses]."
                     .to_string(),
             ));
         }
 
         if configured.len() > 1 && search_config.default_provider.is_none() {
             return Err(BrowserError::ConfigError(
-                "Multiple providers configured. Set `default_provider` to either `azure_ai_search_web` or `perplexity_search`."
+                "Multiple providers configured. Set `default_provider` to one of: azure_ai_search_web, perplexity_search, or genai_responses."
                     .to_string(),
             ));
         }

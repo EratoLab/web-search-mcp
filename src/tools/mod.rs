@@ -106,7 +106,11 @@ pub trait Tool: Send + Sync + Default {
     }
 
     /// Execute the tool with strongly-typed parameters
-    async fn execute_typed(&self, params: Self::Params, context: &mut ToolContext<'_>) -> Result<ToolResult>;
+    async fn execute_typed(
+        &self,
+        params: Self::Params,
+        context: &mut ToolContext<'_>,
+    ) -> Result<ToolResult>;
 
     /// Execute the tool with JSON parameters (default implementation)
     async fn execute(&self, params: Value, context: &mut ToolContext<'_>) -> Result<ToolResult> {

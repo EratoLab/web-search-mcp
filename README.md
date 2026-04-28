@@ -64,16 +64,44 @@ api_key = "your-perplexity-api-key"
 
 </details>
 
+<details>
+<summary>GenAI Responses API example config</summary>
+
+```toml
+[server]
+name = "web-search-mcp"
+version = "0.1.0"
+
+[tool]
+type = "search"
+tool_name = "web_search"
+default_provider = "genai_responses"
+
+[tool.genai_responses]
+base_url = "https://{your-resource}.services.ai.azure.com/openai/deployments/{your-deployment}"
+model = "gpt-4o"
+api_key = "your-genai-api-key"
+api_version = "2025-04-01-preview"
+api_key_header = "api-key"
+reasoning = "none"
+system_prompt = "Use the web_search tool and return concise, source-backed results."
+tool_max_uses = 3
+tool_allowed_domains = ["rust-lang.org", "docs.rs", "github.com"]
+```
+
+</details>
+
 ### Common configuration
 
 - `[server]` metadata used by the MCP server (name/version).
 - `[tool]`:
   - `type = "search"`
   - `tool_name` sets the MCP tool name (default: `web_search`)
-  - `default_provider` selects the runtime provider (`azure_ai_search_web` or `perplexity_search`)
+  - `default_provider` selects the runtime provider (`azure_ai_search_web`, `perplexity_search`, or `genai_responses`)
 - Tool blocks:
   - `[tool.azure_ai_search_web]` for Azure AI Search
   - `[tool.perplexity_search]` for Perplexity
+  - `[tool.genai_responses]` for OpenAI Responses API
 
 ### Provider-specific configuration
 
@@ -100,14 +128,27 @@ api_key = "your-perplexity-api-key"
   - `search_before_date_filter`
   - `search_recency_filter`
 
+#### GenAI Responses (`[tool.genai_responses]`)
+- `base_url`: base URL for your deployment (for example `https://{your-resource}.services.ai.azure.com/openai/deployments/{your-deployment}`)
+- `model`: model name (for example `gpt-4o`)
+- `api_key`: API key for the configured deployment
+- `api_version`: optional API version query parameter (for example `2025-04-01-preview`)
+- `api_key_header`: optional header name for API key (defaults to `Authorization`; set `api-key` for Azure AI)
+- `system_prompt`: optional system prompt / instructions
+- `reasoning`: optional Responses reasoning effort value (defaults to `none`)
+- Optional tool settings forwarded to web_search tool:
+  - `tool_max_uses`
+  - `tool_allowed_domains`
+  - `tool_blocked_domains`
+
 Run the server:
 
 ```bash
 # stdio transport (default)
 cargo run --bin mcp-server --features mcp-server -- -c ./mcp-server.toml --transport stdio
 
-# SSE transport
-cargo run --bin mcp-server --features mcp-server -- --transport sse --host 0.0.0.0 --port 3000
+# HTTP transport
+cargo run --bin mcp-server --features mcp-server -- --transport http --host 0.0.0.0 --port 3000 --http-path /mcp
 
 # HTTP transport
 cargo run --bin mcp-server --features mcp-server -- --transport http --host 0.0.0.0 --port 3000
@@ -131,6 +172,7 @@ The active provider is resolved from configuration at startup:
 **Returns:**
 - Azure AI Search: `response` (string) and `references` (array)
 - Perplexity: `results` (array), `id`, and `server_time`
+- GenAI Responses: `query`, `text`, `model`, and optional `response_id`
 
 **Example:**
 
@@ -156,20 +198,33 @@ docker run -p 3000:3000 -v /path/to/mcp-server.toml:/app/mcp-server.toml web-sea
 
 ```bash
 Options:
-  -t, --transport <TYPE>      Transport type: stdio, sse, http
-  -p, --port <PORT>          Port for SSE or HTTP transport
+  -t, --transport <TYPE>      Transport type: stdio, http
+  -p, --port <PORT>          Port for HTTP transport
       --host <HOST>          Host address to bind to
-      --sse-path <PATH>      SSE endpoint path
-      --sse-post-path <PATH> SSE POST path for messages
+      --sse-path <PATH>      (Deprecated) SSE endpoint path
+      --sse-post-path <PATH> (Deprecated) SSE message post path
       --http-path <PATH>     HTTP streamable endpoint path
   -h, --help                 Print help
   -V, --version              Print version
 ```
 
+## Debugging request timeouts and HTTP traces
+
+- This crate now sets request timeouts to 60 seconds for MCP tool outbound calls. If you still hit
+  `"MCP error -32001: Request timed out"`, inspect upstream service latency and increase the timeout
+  in provider-specific call settings as needed.
+- Enable verbose `reqwest` tracing with:
+
+```bash
+RUST_LOG=web_search_mcp=debug,reqwest=trace cargo run --bin mcp-server --features mcp-server -- -c ./mcp-server.toml --transport stdio
+```
+
+`reqwest` logs use the `log` crate in this project, so enable its module logging directly via `RUST_LOG`.
+
 ## Requirements
 
 - Rust 1.70+
-- Azure AI Search account with a configured knowledge base, or a Perplexity API key
+- Azure AI Search account with a configured knowledge base, a Perplexity API key, or a GenAI/OpenAI Responses API config
 
 ## Azure AI Search Setup Guide
 

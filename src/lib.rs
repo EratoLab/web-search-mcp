@@ -14,7 +14,7 @@
 //!
 //! ```bash
 //! # Use the default config file path: ./mcp-server.toml
-//! 
+//!
 //! # Run the server
 //! cargo run --bin mcp-server
 //! ```

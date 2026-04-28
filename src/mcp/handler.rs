@@ -40,13 +40,11 @@ impl Drop for BrowserServer {
 #[tool_handler]
 impl ServerHandler for BrowserServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            instructions: Some(
-                "Web Search MCP Server - Provides web search capabilities via Azure AI Search and Perplexity."
-                    .into(),
-            ),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            ..Default::default()
-        }
+        let _ = &self.tool_router;
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_instructions(
+                "Web Search MCP Server - Provides web search capabilities via Azure AI Search, Perplexity, and GenAI Responses."
+                    .to_string(),
+            )
     }
 }
