@@ -54,6 +54,18 @@ pub struct TransportConfig {
     /// HTTP streamable endpoint path
     #[serde(default = "default_http_path")]
     pub http_path: String,
+
+    /// Allowed hostnames or host:port authorities for HTTP Host header validation.
+    ///
+    /// When unset, rmcp's default loopback allowlist is used.
+    #[serde(default)]
+    pub allowed_hosts: Option<Vec<String>>,
+
+    /// Disable HTTP Host header allowlist validation.
+    ///
+    /// This permits any Host header and is not recommended for public deployments.
+    #[serde(default)]
+    pub disable_allowed_hosts: bool,
 }
 
 fn default_transport_type() -> String {
@@ -89,6 +101,8 @@ impl Default for TransportConfig {
             sse_path: default_sse_path(),
             sse_post_path: default_sse_post_path(),
             http_path: default_http_path(),
+            allowed_hosts: None,
+            disable_allowed_hosts: false,
         }
     }
 }
@@ -411,6 +425,19 @@ tool_allowed_domains = [\"rust-lang.org\", \"docs.rs\", \"github.com\"]\n\n\
                 self.transport.transport,
                 valid_transports.join(", ")
             )));
+        }
+
+        if self.transport.disable_allowed_hosts
+            && self
+                .transport
+                .allowed_hosts
+                .as_ref()
+                .is_some_and(|allowed_hosts| !allowed_hosts.is_empty())
+        {
+            return Err(BrowserError::ConfigError(
+                "`transport.allowed_hosts` cannot be set when `transport.disable_allowed_hosts` is true."
+                    .to_string(),
+            ));
         }
 
         // Validate provider configuration

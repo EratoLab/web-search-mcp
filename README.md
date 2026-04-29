@@ -40,6 +40,13 @@ kb_name = "your-kb-name"
 knowledge_source_name = "web-search"
 knowledge_source_kind = "web"
 api_key = "your-azure-api-key"
+
+[transport]
+transport = "http"
+host = "0.0.0.0"
+port = 3000
+http_path = "/mcp"
+allowed_hosts = ["example.com", "example.com:3000"]
 ```
 
 </details>
@@ -102,6 +109,13 @@ tool_allowed_domains = ["rust-lang.org", "docs.rs", "github.com"]
   - `[tool.azure_ai_search_web]` for Azure AI Search
   - `[tool.perplexity_search]` for Perplexity
   - `[tool.genai_responses]` for OpenAI Responses API
+- `[transport]` configures MCP transport behavior:
+  - `transport`: `stdio` or `http` (defaults to `stdio`)
+  - `host`: HTTP bind host (defaults to `127.0.0.1`)
+  - `port`: HTTP bind port (defaults to `3000`)
+  - `http_path`: streamable HTTP endpoint path (defaults to `/mcp`)
+  - `allowed_hosts`: optional Host header allowlist for HTTP transport; when unset, rmcp's loopback defaults are used
+  - `disable_allowed_hosts`: set to `true` to disable Host header allowlist validation
 
 ### Provider-specific configuration
 
@@ -204,6 +218,9 @@ Options:
       --sse-path <PATH>      (Deprecated) SSE endpoint path
       --sse-post-path <PATH> (Deprecated) SSE message post path
       --http-path <PATH>     HTTP streamable endpoint path
+      --allowed-hosts <HOST> Allowed Host header values; repeat or comma-separate values
+      --disable-allowed-hosts
+                             Disable HTTP Host header allowlist validation
   -h, --help                 Print help
   -V, --version              Print version
 ```

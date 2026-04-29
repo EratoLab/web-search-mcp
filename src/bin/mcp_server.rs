@@ -13,7 +13,7 @@ use web_search_mcp::mcp::BrowserServer;
 
 #[cfg(feature = "mcp-server")]
 use rmcp::transport::streamable_http_server::{
-    StreamableHttpService, session::local::LocalSessionManager,
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -48,6 +48,15 @@ struct Cli {
     /// HTTP path (default: /mcp)
     #[arg(long)]
     http_path: Option<String>,
+
+    /// Allowed Host header values for HTTP transport; repeat or comma-separate values
+    #[arg(long, value_delimiter = ',')]
+    allowed_hosts: Vec<String>,
+
+    /// Disable HTTP Host header allowlist validation
+    #[arg(long)]
+    disable_allowed_hosts: bool,
+
     /// SSE endpoint path (deprecated, retained for compatibility with legacy config)
     #[arg(long)]
     sse_path: Option<String>,
@@ -76,6 +85,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http_path = cli
         .http_path
         .unwrap_or_else(|| config.transport.http_path.clone());
+    let allowed_hosts = if cli.allowed_hosts.is_empty() {
+        config.transport.allowed_hosts.clone()
+    } else {
+        Some(cli.allowed_hosts)
+    };
+    let disable_allowed_hosts = cli.disable_allowed_hosts || config.transport.disable_allowed_hosts;
+
+    if disable_allowed_hosts
+        && allowed_hosts
+            .as_ref()
+            .is_some_and(|allowed_hosts| !allowed_hosts.is_empty())
+    {
+        return Err("allowed_hosts cannot be set when disable_allowed_hosts is true".into());
+    }
 
     if cli.sse_path.is_some() || cli.sse_post_path.is_some() {
         info!("sse_path/sse_post_path are deprecated and ignored; use --transport http instead");
@@ -152,10 +175,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 BrowserServer::new().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
             };
 
+            let mut http_config = StreamableHttpServerConfig::default();
+            if disable_allowed_hosts {
+                info!("Allowed hosts validation: disabled");
+                http_config = http_config.disable_allowed_hosts();
+            } else if let Some(allowed_hosts) = allowed_hosts {
+                info!("Allowed hosts: {}", allowed_hosts.join(", "));
+                http_config = http_config.with_allowed_hosts(allowed_hosts);
+            }
+
             let http_service = StreamableHttpService::new(
                 service_factory,
                 LocalSessionManager::default().into(),
-                Default::default(),
+                http_config,
             );
 
             let router = axum::Router::new().nest_service(&http_path, http_service);
