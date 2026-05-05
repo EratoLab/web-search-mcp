@@ -23,6 +23,25 @@ impl BrowserServer {
             tool_router: Self::tool_router(),
         })
     }
+
+    fn tool_router() -> ToolRouter<Self> {
+        let mut tool_router = Self::base_tool_routes();
+        let config = crate::config::get_global_config_sync();
+        let configured_tool_name = match &config.tool {
+            crate::config::ToolSection::Search(tool_config) => tool_config.tool_name().to_string(),
+        };
+
+        if configured_tool_name != "web_search" {
+            if let Some(mut route) = tool_router.map.remove("web_search") {
+                route.attr.name = configured_tool_name.clone().into();
+                let _ = tool_router
+                    .map
+                    .insert(configured_tool_name.clone().into(), route);
+            }
+        }
+
+        tool_router
+    }
 }
 
 impl Default for BrowserServer {

@@ -31,7 +31,7 @@ fn convert_result(result: InternalToolResult) -> Result<CallToolResult, McpError
 /// Macro to register MCP tools by automatically generating wrapper functions
 macro_rules! register_mcp_tools {
     ($($mcp_name:ident => $tool_type:ty, $description:expr);* $(;)?) => {
-        #[tool_router]
+        #[tool_router(router = base_tool_routes)]
         impl BrowserServer {
             $(
                 #[tool(description = $description)]
