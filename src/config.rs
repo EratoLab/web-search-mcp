@@ -483,3 +483,11 @@ pub async fn get_global_config() -> Arc<ServerConfig> {
         .expect("Global config not initialized. Call set_global_config() first.")
         .clone()
 }
+
+/// Get the global configuration without async.
+pub fn get_global_config_sync() -> Arc<ServerConfig> {
+    GLOBAL_CONFIG
+        .get()
+        .expect("Global config not initialized. Call set_global_config() first.")
+        .clone()
+}
