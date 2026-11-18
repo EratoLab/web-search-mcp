@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server for web search using configurable provider
 
 ## ✨ Highlights
 
-- **Configurable Providers** - Supports both Azure AI Search web and Perplexity web search backends
+- **Configurable Providers** - Supports Azure AI Search, Perplexity, GenAI Responses, and Google Custom Search
 - **Lightweight** - Minimal dependencies, no browser automation overhead
 - **MCP Compatible** - Standard MCP server implementation for AI assistants
 - **Simple Configuration** - Configure via TOML (`./mcp-server.toml` by default)
@@ -98,17 +98,40 @@ tool_allowed_domains = ["rust-lang.org", "docs.rs", "github.com"]
 
 </details>
 
+<details>
+<summary>Google Custom Search example config</summary>
+
+```toml
+[server]
+name = "web-search-mcp"
+version = "0.1.0"
+
+[tool]
+type = "search"
+default_provider = "google_custom_search"
+
+[tool.google_custom_search]
+api_key = "your-google-api-key"
+search_engine_id = "your-programmable-search-engine-id"
+
+[metadata]
+prefix = "chat.erato/"
+```
+
+</details>
+
 ### Common configuration
 
 - `[server]` metadata used by the MCP server (name/version).
 - `[tool]`:
   - `type = "search"`
   - `tool_name` sets the MCP tool name (default: `web_search`)
-  - `default_provider` selects the runtime provider (`azure_ai_search_web`, `perplexity_search`, or `genai_responses`)
+  - `default_provider` selects the runtime provider (`azure_ai_search_web`, `perplexity_search`, `genai_responses`, or `google_custom_search`)
 - Tool blocks:
   - `[tool.azure_ai_search_web]` for Azure AI Search
   - `[tool.perplexity_search]` for Perplexity
   - `[tool.genai_responses]` for OpenAI Responses API
+  - `[tool.google_custom_search]` for Google Custom Search
 - `[transport]` configures MCP transport behavior:
   - `transport`: `stdio` or `http` (defaults to `stdio`)
   - `host`: HTTP bind host (defaults to `127.0.0.1`)
@@ -155,6 +178,12 @@ tool_allowed_domains = ["rust-lang.org", "docs.rs", "github.com"]
   - `tool_allowed_domains`
   - `tool_blocked_domains`
 
+#### Google Custom Search (`[tool.google_custom_search]`)
+- `api_key`: Google Custom Search JSON API key
+- `search_engine_id`: Programmable Search Engine ID (the `cx` parameter)
+
+Google plans to discontinue the Custom Search JSON API on January 1, 2027. [Google Custom Search JSON API overview](https://developers.google.com/custom-search/v1/overview)
+
 Run the server:
 
 ```bash
@@ -187,6 +216,7 @@ The active provider is resolved from configuration at startup:
 - Azure AI Search: `response` (string) and `references` (array)
 - Perplexity: `results` (array), `id`, and `server_time`
 - GenAI Responses: `query`, `text`, `model`, and optional `response_id`
+- Google Custom Search: `results` (an array of objects with `title`, `url`, and `snippet`)
 
 **Example:**
 
@@ -241,7 +271,7 @@ RUST_LOG=web_search_mcp=debug,reqwest=trace cargo run --bin mcp-server --feature
 ## Requirements
 
 - Rust 1.70+
-- Azure AI Search account with a configured knowledge base, a Perplexity API key, or a GenAI/OpenAI Responses API config
+- Azure AI Search account with a configured knowledge base, a Perplexity API key, a GenAI/OpenAI Responses API config, or a Google Custom Search API key and search engine ID
 
 ## Azure AI Search Setup Guide
 

@@ -120,7 +120,7 @@ pub struct SearchToolConfig {
     #[serde(default = "default_tool_name")]
     pub tool_name: String,
 
-    /// Optional default provider if both are configured.
+    /// Optional default provider if multiple providers are configured.
     #[serde(default)]
     pub default_provider: Option<String>,
 
@@ -135,6 +135,18 @@ pub struct SearchToolConfig {
     /// GenAI Responses (OpenAI Responses API) search provider configuration.
     #[serde(default)]
     pub genai_responses: Option<GenAIResponsesSearchConfig>,
+
+    /// Google Custom Search provider configuration.
+    #[serde(default)]
+    pub google_custom_search: Option<GoogleCustomSearchConfig>,
+}
+
+/// Google Custom Search provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoogleCustomSearchConfig {
+    pub api_key: String,
+    /// Programmable Search Engine ID (Google's `cx` parameter).
+    pub search_engine_id: String,
 }
 
 /// Azure AI Search Web provider configuration.
@@ -229,6 +241,9 @@ impl SearchToolConfig {
         if self.genai_responses.is_some() {
             providers.push("genai_responses");
         }
+        if self.google_custom_search.is_some() {
+            providers.push("google_custom_search");
+        }
         providers
     }
 
@@ -237,12 +252,7 @@ impl SearchToolConfig {
     }
 
     pub fn has_provider(&self, provider: &str) -> bool {
-        match provider {
-            "azure_ai_search_web" => self.azure_ai_search_web.is_some(),
-            "perplexity_search" => self.perplexity_search.is_some(),
-            "genai_responses" => self.genai_responses.is_some(),
-            _ => false,
-        }
+        self.configured_providers().contains(&provider)
     }
 
     pub fn tool_name(&self) -> &str {
@@ -445,16 +455,16 @@ tool_allowed_domains = [\"rust-lang.org\", \"docs.rs\", \"github.com\"]\n\n\
 
         if configured.is_empty() {
             return Err(BrowserError::ConfigError(
-                "No search providers configured. Configure at least one of [tool.azure_ai_search_web], [tool.perplexity_search], or [tool.genai_responses]."
+                "No search providers configured. Configure at least one of [tool.azure_ai_search_web], [tool.perplexity_search], [tool.genai_responses], or [tool.google_custom_search]."
                     .to_string(),
             ));
         }
 
         if configured.len() > 1 && search_config.default_provider.is_none() {
-            return Err(BrowserError::ConfigError(
-                "Multiple providers configured. Set `default_provider` to one of: azure_ai_search_web, perplexity_search, or genai_responses."
-                    .to_string(),
-            ));
+            return Err(BrowserError::ConfigError(format!(
+                "Multiple providers configured. Set `default_provider` to one of: {}",
+                configured.join(", ")
+            )));
         }
 
         if let Some(default_provider) = &search_config.default_provider {
