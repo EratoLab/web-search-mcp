@@ -5,13 +5,15 @@
 pub mod handler;
 pub use handler::BrowserServer;
 
-use crate::tools::{self, Tool, ToolContext, ToolResult as InternalToolResult};
+use crate::error::BrowserError;
+use crate::tools::{Tool, ToolContext, ToolResult as InternalToolResult, WebSearchTool};
 use rmcp::{
     ErrorData as McpError,
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
+    model::{CallToolResult, Content, JsonObject},
     tool, tool_router,
 };
+use serde_json::Value;
 
 /// Convert internal ToolResult to MCP CallToolResult
 fn convert_result(result: InternalToolResult) -> Result<CallToolResult, McpError> {
@@ -28,30 +30,22 @@ fn convert_result(result: InternalToolResult) -> Result<CallToolResult, McpError
     }
 }
 
-/// Macro to register MCP tools by automatically generating wrapper functions
-macro_rules! register_mcp_tools {
-    ($($mcp_name:ident => $tool_type:ty, $description:expr);* $(;)?) => {
-        #[tool_router(router = base_tool_routes)]
-        impl BrowserServer {
-            $(
-                #[tool(description = $description)]
-                async fn $mcp_name(
-                    &self,
-                    params: Parameters<<$tool_type as Tool>::Params>,
-                ) -> Result<CallToolResult, McpError> {
-                    let mut context = ToolContext::new();
-                    let tool = <$tool_type>::default();
-                    let result = tool.execute_typed(params.0, &mut context)
-                        .await
-                        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
-                    convert_result(result)
-                }
-            )*
-        }
-    };
-}
-
-// Register all MCP tools using the macro
-register_mcp_tools! {
-    web_search => tools::web_search::WebSearchTool, "Perform a web search using the configured provider. Returns search results and metadata.";
+#[tool_router(router = base_tool_routes)]
+impl BrowserServer {
+    #[tool(
+        description = "Perform a web search using the configured provider. Returns search results and metadata."
+    )]
+    async fn web_search(
+        &self,
+        Parameters(params): Parameters<JsonObject>,
+    ) -> Result<CallToolResult, McpError> {
+        let result = WebSearchTool
+            .execute(Value::Object(params), &mut ToolContext::new())
+            .await
+            .map_err(|error| match error {
+                BrowserError::InvalidArgument(message) => McpError::invalid_params(message, None),
+                error => McpError::internal_error(error.to_string(), None),
+            })?;
+        convert_result(result)
+    }
 }

@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server for web search using configurable provider
 
 ## ✨ Highlights
 
-- **Configurable Providers** - Supports Azure AI Search, Perplexity, GenAI Responses, and Google Custom Search
+- **Configurable Providers** - Supports Azure AI Search, Perplexity, GenAI Responses, Google Custom Search, and LinkUp
 - **Lightweight** - Minimal dependencies, no browser automation overhead
 - **MCP Compatible** - Standard MCP server implementation for AI assistants
 - **Simple Configuration** - Configure via TOML (`./mcp-server.toml` by default)
@@ -120,18 +120,40 @@ prefix = "chat.erato/"
 
 </details>
 
+<details>
+<summary>LinkUp example config</summary>
+
+```toml
+[server]
+name = "web-search-mcp"
+version = "0.1.0"
+
+[tool]
+type = "search"
+default_provider = "linkup_search"
+
+[tool.linkup_search]
+api_key = "your-linkup-api-key"
+
+[metadata]
+prefix = "chat.erato/"
+```
+
+</details>
+
 ### Common configuration
 
 - `[server]` metadata used by the MCP server (name/version).
 - `[tool]`:
   - `type = "search"`
   - `tool_name` sets the MCP tool name (default: `web_search`)
-  - `default_provider` selects the runtime provider (`azure_ai_search_web`, `perplexity_search`, `genai_responses`, or `google_custom_search`)
+  - `default_provider` selects the runtime provider (`azure_ai_search_web`, `perplexity_search`, `genai_responses`, `google_custom_search`, or `linkup_search`)
 - Tool blocks:
   - `[tool.azure_ai_search_web]` for Azure AI Search
   - `[tool.perplexity_search]` for Perplexity
   - `[tool.genai_responses]` for OpenAI Responses API
   - `[tool.google_custom_search]` for Google Custom Search
+  - `[tool.linkup_search]` for LinkUp
 - `[transport]` configures MCP transport behavior:
   - `transport`: `stdio` or `http` (defaults to `stdio`)
   - `host`: HTTP bind host (defaults to `127.0.0.1`)
@@ -184,6 +206,26 @@ prefix = "chat.erato/"
 
 Google plans to discontinue the Custom Search JSON API on January 1, 2027. [Google Custom Search JSON API overview](https://developers.google.com/custom-search/v1/overview)
 
+#### LinkUp (`[tool.linkup_search]`)
+
+- `api_key` is the LinkUp API key.
+- `base_url` defaults to `https://api.linkup.so/v1`.
+- `depth` accepts `flash`, `fast` (default), `standard`, or `deep`.
+- `include_images` includes image results when enabled and defaults to `false`.
+- `include_domains` and `exclude_domains` optionally filter by domain.
+- `from_date` and `to_date` optionally filter by publication date using `YYYY-MM-DD`.
+- `max_results` optionally caps the number of results and must be a positive integer.
+
+Callers can override `depth`, `include_images`, `from_date`, `to_date`, and `max_results` per search. Omitted parameters use the configured values. Each of these toggles defaults to `true`. Set a toggle to `false` to remove its parameter from the tool schema and reject calls that supply it.
+
+| Config toggle | MCP parameter |
+| --- | --- |
+| `allow_depth_parameter` | `depth` |
+| `allow_include_images_parameter` | `include_images` |
+| `allow_from_date_parameter` | `from_date` |
+| `allow_to_date_parameter` | `to_date` |
+| `allow_max_results_parameter` | `max_results` |
+
 Run the server:
 
 ```bash
@@ -211,12 +253,14 @@ The active provider is resolved from configuration at startup:
 
 **Parameters:**
 - `query` (string): The search query text
+- When LinkUp is active, the tool also exposes the enabled [LinkUp search parameters](#linkup-toollinkup_search).
 
 **Returns:**
 - Azure AI Search: `response` (string) and `references` (array)
 - Perplexity: `results` (array), `id`, and `server_time`
 - GenAI Responses: `query`, `text`, `model`, and optional `response_id`
 - Google Custom Search: `results` (an array of objects with `title`, `url`, and `snippet`)
+- LinkUp returns a `results` array with text results and optional image results. Text results include `type`, `name`, `url`, and `content`. [LinkUp Search API](https://docs.linkup.so/pages/documentation/endpoints/search/overview)
 
 **Example:**
 
@@ -271,7 +315,7 @@ RUST_LOG=web_search_mcp=debug,reqwest=trace cargo run --bin mcp-server --feature
 ## Requirements
 
 - Rust 1.70+
-- Azure AI Search account with a configured knowledge base, a Perplexity API key, a GenAI/OpenAI Responses API config, or a Google Custom Search API key and search engine ID
+- Credentials for at least one search provider
 
 ## Azure AI Search Setup Guide
 

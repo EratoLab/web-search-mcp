@@ -139,6 +139,74 @@ pub struct SearchToolConfig {
     /// Google Custom Search provider configuration.
     #[serde(default)]
     pub google_custom_search: Option<GoogleCustomSearchConfig>,
+
+    /// LinkUp search provider configuration.
+    #[serde(default)]
+    pub linkup_search: Option<LinkupSearchConfig>,
+}
+
+/// LinkUp search provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkupSearchConfig {
+    pub api_key: String,
+
+    #[serde(default = "default_linkup_base_url")]
+    pub base_url: String,
+
+    #[serde(default)]
+    pub depth: LinkupSearchDepth,
+
+    #[serde(default)]
+    pub include_images: bool,
+
+    pub include_domains: Option<Vec<String>>,
+    pub exclude_domains: Option<Vec<String>>,
+    pub from_date: Option<String>,
+    pub to_date: Option<String>,
+    pub max_results: Option<std::num::NonZeroU32>,
+
+    #[serde(default = "default_true")]
+    pub allow_depth_parameter: bool,
+    #[serde(default = "default_true")]
+    pub allow_include_images_parameter: bool,
+    #[serde(default = "default_true")]
+    pub allow_from_date_parameter: bool,
+    #[serde(default = "default_true")]
+    pub allow_to_date_parameter: bool,
+    #[serde(default = "default_true")]
+    pub allow_max_results_parameter: bool,
+}
+
+impl LinkupSearchConfig {
+    pub(crate) fn disabled_parameters(&self) -> impl Iterator<Item = &'static str> {
+        [
+            ("depth", self.allow_depth_parameter),
+            ("include_images", self.allow_include_images_parameter),
+            ("from_date", self.allow_from_date_parameter),
+            ("to_date", self.allow_to_date_parameter),
+            ("max_results", self.allow_max_results_parameter),
+        ]
+        .into_iter()
+        .filter_map(|(name, allowed)| (!allowed).then_some(name))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkupSearchDepth {
+    Flash,
+    #[default]
+    Fast,
+    Standard,
+    Deep,
+}
+
+fn default_linkup_base_url() -> String {
+    "https://api.linkup.so/v1".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Google Custom Search provider configuration.
@@ -243,6 +311,9 @@ impl SearchToolConfig {
         }
         if self.google_custom_search.is_some() {
             providers.push("google_custom_search");
+        }
+        if self.linkup_search.is_some() {
+            providers.push("linkup_search");
         }
         providers
     }
@@ -455,7 +526,7 @@ tool_allowed_domains = [\"rust-lang.org\", \"docs.rs\", \"github.com\"]\n\n\
 
         if configured.is_empty() {
             return Err(BrowserError::ConfigError(
-                "No search providers configured. Configure at least one of [tool.azure_ai_search_web], [tool.perplexity_search], [tool.genai_responses], or [tool.google_custom_search]."
+                "No search providers configured. Configure at least one of [tool.azure_ai_search_web], [tool.perplexity_search], [tool.genai_responses], [tool.google_custom_search], or [tool.linkup_search]."
                     .to_string(),
             ));
         }
@@ -500,4 +571,13 @@ pub fn get_global_config_sync() -> Arc<ServerConfig> {
         .get()
         .expect("Global config not initialized. Call set_global_config() first.")
         .clone()
+}
+
+pub(crate) fn active_linkup_config() -> Option<&'static LinkupSearchConfig> {
+    let ToolSection::Search(tool_config) = &GLOBAL_CONFIG.get()?.tool;
+    if tool_config.resolved_provider().ok().as_deref() == Some("linkup_search") {
+        tool_config.linkup_search.as_ref()
+    } else {
+        None
+    }
 }
