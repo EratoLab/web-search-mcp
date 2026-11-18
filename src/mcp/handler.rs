@@ -1,5 +1,6 @@
 //! ServerHandler implementation for WebSearchServer
 
+use crate::tools::{Tool, WebSearchTool};
 use log::debug;
 use rmcp::{
     ServerHandler,
@@ -7,6 +8,8 @@ use rmcp::{
     model::{ServerCapabilities, ServerInfo},
     tool_handler,
 };
+use serde_json::Value;
+use std::sync::Arc;
 
 /// MCP Server wrapper for web search
 ///
@@ -31,13 +34,13 @@ impl BrowserServer {
             crate::config::ToolSection::Search(tool_config) => tool_config.tool_name().to_string(),
         };
 
-        if configured_tool_name != "web_search" {
-            if let Some(mut route) = tool_router.map.remove("web_search") {
-                route.attr.name = configured_tool_name.clone().into();
-                let _ = tool_router
-                    .map
-                    .insert(configured_tool_name.clone().into(), route);
-            }
+        if let Some(mut route) = tool_router.map.remove("web_search") {
+            let Value::Object(schema) = WebSearchTool.parameters_schema() else {
+                unreachable!("WebSearchTool parameters must have an object schema");
+            };
+            route.attr.input_schema = Arc::new(schema);
+            route.attr.name = configured_tool_name.clone().into();
+            tool_router.map.insert(configured_tool_name.into(), route);
         }
 
         tool_router
@@ -62,7 +65,7 @@ impl ServerHandler for BrowserServer {
         let _ = &self.tool_router;
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "Web Search MCP Server - Provides web search capabilities via Azure AI Search, Perplexity, and GenAI Responses."
+                "Web Search MCP Server - Provides web search capabilities via Azure AI Search, Perplexity, GenAI Responses, Google Custom Search, and LinkUp."
                     .to_string(),
             )
     }
